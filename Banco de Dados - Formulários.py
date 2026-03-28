@@ -1,26 +1,27 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
-import sqlite3
+import json
+import os
 
-# Função para criar a tabela se não existir
-def create_table():
-    conn = sqlite3.connect('user_data.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            age TEXT,
-            email TEXT,
-            location TEXT,
-            gender TEXT,
-            hobbies TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# Nome do arquivo de dados
+DATA_FILE = 'user_data.json'
 
-# Função para adicionar ou salvar usuário
+def init_json():
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump([], f)
+
+def load_data():
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_data(data):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
 def add_or_save_user():
     name = name_entry.get()
     age = age_entry.get()
@@ -33,192 +34,179 @@ def add_or_save_user():
         messagebox.showwarning("Aviso", "Por favor, preencha todos os campos.")
         return
 
-    conn = sqlite3.connect('user_data.db')
-    cursor = conn.cursor()
+    new_user = {
+        "name": name,
+        "age": age,
+        "email": email,
+        "location": location,
+        "gender": gender,
+        "hobbies": hobbies
+    }
 
-    # Verifica se é uma edição ou um novo cadastro
-    if edit_mode.get():
-        selected_id = int(user_data_tree.item(user_data_tree.selection())['values'][0])
-        cursor.execute('''
-            UPDATE users SET name=?, age=?, email=?, location=?, gender=?, hobbies=? WHERE id=?
-        ''', (name, age, email, location, gender, hobbies, selected_id))
-        messagebox.showinfo("Sucesso", "Dados atualizados com sucesso!")
+    data = load_data()
+    current_idx = edit_mode.get()
+
+    if current_idx != "None":
+        idx = int(current_idx)
+        data[idx] = new_user
+        messagebox.showinfo("Sucesso", "Dados atualizados!")
     else:
-        cursor.execute('''
-            INSERT INTO users (name, age, email, location, gender, hobbies) 
-            VALUES (?, ?, ?, ?, ?, ?)''', (name, age, email, location, gender, hobbies))
-        messagebox.showinfo("Sucesso", "Dados enviados com sucesso!")
+        data.append(new_user)
+        messagebox.showinfo("Sucesso", "Dados adicionados!")
     
-    conn.commit()
-    conn.close()
+    save_data(data)
     clear_form()
-    refresh_user_data()
-    edit_mode.set(False)
-    add_save_button.config(text="Adicionar")
+    refresh_cards()
 
-# Função para limpar o formulário
 def clear_form():
     name_entry.delete(0, tk.END)
     age_entry.delete(0, tk.END)
     email_entry.delete(0, tk.END)
     location_entry.delete(0, tk.END)
     hobbies_text.delete("1.0", tk.END)
-    gender_var.set(None)
-    edit_mode.set(False)
+    gender_var.set("")
+    edit_mode.set("None")
     add_save_button.config(text="Adicionar")
 
-# Função para buscar usuários
-def search_users():
-    search_term = search_entry.get().lower()
-    refresh_user_data(search_term)
+def delete_user(index):
+    if messagebox.askyesno("Confirmar", "Deseja excluir este usuário?"):
+        data = load_data()
+        data.pop(index)
+        save_data(data)
+        refresh_cards()
 
-# Função para atualizar a tabela com dados de usuários
-def refresh_user_data(search_term=""):
-    for row in user_data_tree.get_children():
-        user_data_tree.delete(row)
-
-    conn = sqlite3.connect('user_data.db')
-    cursor = conn.cursor()
-    query = 'SELECT * FROM users'
-    if search_term:
-        query += ' WHERE name LIKE ? OR email LIKE ? OR location LIKE ?'
-        cursor.execute(query, (f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'))
-    else:
-        cursor.execute(query)
+def prepare_edit(index):
+    data = load_data()
+    user = data[index]
     
-    for row in cursor.fetchall():
-        user_data_tree.insert('', 'end', values=row)
-    conn.close()
+    name_entry.delete(0, tk.END)
+    name_entry.insert(0, user['name'])
+    age_entry.delete(0, tk.END)
+    age_entry.insert(0, user['age'])
+    email_entry.delete(0, tk.END)
+    email_entry.insert(0, user['email'])
+    location_entry.delete(0, tk.END)
+    location_entry.insert(0, user['location'])
+    gender_var.set(user['gender'])
+    hobbies_text.delete("1.0", tk.END)
+    hobbies_text.insert("1.0", user['hobbies'])
 
-# Função para carregar dados para edição
-def edit_user():
-    try:
-        selected_item = user_data_tree.selection()[0]
-        values = user_data_tree.item(selected_item, 'values')
+    edit_mode.set(str(index))
+    add_save_button.config(text="Salvar Alterações")
+
+def refresh_cards(event=None):
+    for widget in scrollable_frame.winfo_children():
+        widget.destroy()
+
+    search_term = search_entry.get().lower()
+    data = load_data()
+    
+    filtered_data = []
+    for i, user in enumerate(data):
+        if search_term and not any(search_term in str(val).lower() for val in user.values()):
+            continue
+        filtered_data.append((i, user))
+
+    width = canvas.winfo_width()
+    num_columns = 3 if width > 900 else 2
+
+    for col in range(num_columns):
+        scrollable_frame.grid_columnconfigure(col, weight=1, uniform="group1")
+
+    for i, (original_idx, user) in enumerate(filtered_data):
+        row, col = divmod(i, num_columns)
         
-        name_entry.delete(0, tk.END)
-        name_entry.insert(0, values[1])
+        card = tk.Frame(scrollable_frame, bg="white", highlightbackground="#d1d1d1", 
+                        highlightthickness=1, padx=10, pady=10)
+        card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
-        age_entry.delete(0, tk.END)
-        age_entry.insert(0, values[2])
+        # Nome e Info básica
+        tk.Label(card, text=user['name'], font=("Arial", 11, "bold"), bg="white", wraplength=250).pack(anchor="w")
+        tk.Label(card, text=f"{user['age']} anos | {user['gender']}", bg="white", font=("Arial", 9)).pack(anchor="w")
+        
+        # Localização e Email
+        tk.Label(card, text=f"📍 {user['location']}", bg="white", fg="#555", font=("Arial", 8), wraplength=250).pack(anchor="w")
+        tk.Label(card, text=f"✉ {user['email']}", bg="white", fg="#0066cc", font=("Arial", 8), wraplength=250).pack(anchor="w")
+        
+        # --- Hobbies (REINSERIDOS AQUI) ---
+        tk.Label(card, text=f"Hobbies: {user['hobbies']}", bg="white", font=("Arial", 8, "italic"), 
+                 wraplength=250, justify="left", fg="#333").pack(anchor="w", pady=(5,0))
+        
+        # Botões
+        btn_frame = tk.Frame(card, bg="white")
+        btn_frame.pack(fill="x", pady=(8,0))
+        
+        tk.Button(btn_frame, text="Editar", bg="#FF9800", fg="white", font=("Arial", 8),
+                  command=lambda i=original_idx: prepare_edit(i)).pack(side="left", expand=True, fill="x", padx=2)
+        tk.Button(btn_frame, text="Excluir", bg="#F44336", fg="white", font=("Arial", 8),
+                  command=lambda i=original_idx: delete_user(i)).pack(side="left", expand=True, fill="x", padx=2)
 
-        email_entry.delete(0, tk.END)
-        email_entry.insert(0, values[3])
-
-        location_entry.delete(0, tk.END)
-        location_entry.insert(0, values[4])
-
-        gender_var.set(values[5])
-
-        hobbies_text.delete("1.0", tk.END)
-        hobbies_text.insert("1.0", values[6])
-
-        edit_mode.set(True)
-        add_save_button.config(text="Salvar")
-
-    except IndexError:
-        messagebox.showwarning("Aviso", "Por favor, selecione um usuário para editar.")
-
-# Função para excluir usuário
-def delete_user():
-    try:
-        selected_item = user_data_tree.selection()[0]
-        selected_id = int(user_data_tree.item(selected_item, 'values')[0])
-
-        conn = sqlite3.connect('user_data.db')
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM users WHERE id=?", (selected_id,))
-        conn.commit()
-        conn.close()
-
-        user_data_tree.delete(selected_item)
-        messagebox.showinfo("Sucesso", "Usuário excluído com sucesso!")
-    except IndexError:
-        messagebox.showwarning("Aviso", "Por favor, selecione um usuário para excluir.")
-
-# Configuração da interface gráfica
+# Interface Principal
 root = tk.Tk()
-root.title("Formulário de Usuário")
-root.geometry("900x600")
-root.config(bg="#eaeef1")
+root.title("Gerenciador de Usuários")
+root.geometry("1000x750")
+root.config(bg="#f0f2f5")
 
-create_table()
+init_json()
+edit_mode = tk.StringVar(value="None")
 
-# Variável para verificar o modo de edição
-edit_mode = tk.BooleanVar(value=False)
+# Formulário (Layout reorganizado para liberar espaço)
+form_container = tk.LabelFrame(root, text=" Cadastro / Edição ", bg="white", padx=10, pady=5)
+form_container.pack(fill="x", padx=20, pady=10)
 
-# Frame do formulário
-form_frame = tk.Frame(root, bg="white", padx=20, pady=20)
-form_frame.pack(pady=20, padx=20)
+tk.Label(form_container, text="Nome:", bg="white").grid(row=0, column=0, sticky="w")
+name_entry = tk.Entry(form_container, width=30)
+name_entry.grid(row=0, column=1, pady=2, padx=5)
 
-tk.Label(form_frame, text="Nome:", bg="white").grid(row=0, column=0, sticky="w")
-name_entry = tk.Entry(form_frame, width=40)
-name_entry.grid(row=0, column=1, padx=10, pady=5)
+tk.Label(form_container, text="Idade:", bg="white").grid(row=0, column=2, sticky="w")
+age_entry = tk.Entry(form_container, width=10)
+age_entry.grid(row=0, column=3, pady=2, padx=5)
 
-tk.Label(form_frame, text="Idade:", bg="white").grid(row=1, column=0, sticky="w")
-age_entry = tk.Entry(form_frame, width=40)
-age_entry.grid(row=1, column=1, padx=10, pady=5)
+tk.Label(form_container, text="Email:", bg="white").grid(row=1, column=0, sticky="w")
+email_entry = tk.Entry(form_container, width=30)
+email_entry.grid(row=1, column=1, pady=2, padx=5)
 
-tk.Label(form_frame, text="Email:", bg="white").grid(row=2, column=0, sticky="w")
-email_entry = tk.Entry(form_frame, width=40)
-email_entry.grid(row=2, column=1, padx=10, pady=5)
+tk.Label(form_container, text="Local:", bg="white").grid(row=1, column=2, sticky="w")
+location_entry = tk.Entry(form_container, width=20)
+location_entry.grid(row=1, column=3, pady=2, padx=5)
 
-tk.Label(form_frame, text="Local de Residência:", bg="white").grid(row=3, column=0, sticky="w")
-location_entry = tk.Entry(form_frame, width=40)
-location_entry.grid(row=3, column=1, padx=10, pady=5)
-
-tk.Label(form_frame, text="Sexo:", bg="white").grid(row=4, column=0, sticky="w")
 gender_var = tk.StringVar()
-tk.Radiobutton(form_frame, text="Masculino", variable=gender_var, value="Masculino", bg="white").grid(row=4, column=1, sticky="w")
-tk.Radiobutton(form_frame, text="Feminino", variable=gender_var, value="Feminino", bg="white").grid(row=4, column=1, sticky="e")
+tk.Radiobutton(form_container, text="Masc", variable=gender_var, value="Masculino", bg="white").grid(row=2, column=1, sticky="w")
+tk.Radiobutton(form_container, text="Fem", variable=gender_var, value="Feminino", bg="white").grid(row=2, column=1, sticky="e")
 
-tk.Label(form_frame, text="Hobbies:", bg="white").grid(row=5, column=0, sticky="w")
-hobbies_text = tk.Text(form_frame, height=5, width=37)
-hobbies_text.grid(row=5, column=1, padx=10, pady=5)
+tk.Label(form_container, text="Hobbies:", bg="white").grid(row=2, column=2, sticky="nw")
+hobbies_text = tk.Text(form_container, height=2, width=30)
+hobbies_text.grid(row=2, column=3, pady=2, padx=5)
 
-# Botões de adicionar/salvar, editar e excluir
-add_save_button = tk.Button(form_frame, text="Adicionar", command=add_or_save_user, bg="#4CAF50", fg="white")
-add_save_button.grid(row=6, column=0, columnspan=2, pady=10)
+add_save_button = tk.Button(form_container, text="Adicionar", command=add_or_save_user, bg="#4CAF50", fg="white")
+add_save_button.grid(row=3, column=0, columnspan=4, pady=5, sticky="ew")
 
-edit_button = tk.Button(form_frame, text="Editar", command=edit_user, bg="#FF9800", fg="white")
-edit_button.grid(row=7, column=0, columnspan=2, pady=10)
+# Busca
+search_frame = tk.Frame(root, bg="#f0f2f5")
+search_frame.pack(fill="x", padx=20)
+tk.Label(search_frame, text="Buscar:", bg="#f0f2f5").pack(side="left")
+search_entry = tk.Entry(search_frame)
+search_entry.pack(side="left", fill="x", expand=True, padx=5)
+search_entry.bind("<KeyRelease>", refresh_cards)
 
-delete_button = tk.Button(form_frame, text="Excluir", command=delete_user, bg="#F44336", fg="white")
-delete_button.grid(row=8, column=0, columnspan=2, pady=10)
+# Área de Cards com Scroll
+container = tk.Frame(root, bg="#f0f2f5")
+container.pack(fill="both", expand=True, padx=20, pady=10)
 
-# Frame da tabela de usuários
-table_frame = tk.Frame(root, bg="#eaeef1")
-table_frame.pack(pady=20, padx=20, fill="both", expand=True)
+canvas = tk.Canvas(container, bg="#f0f2f5", highlightthickness=0)
+scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+scrollable_frame = tk.Frame(canvas, bg="#f0f2f5")
 
-tk.Label(table_frame, text="Buscar:", bg="#eaeef1").grid(row=0, column=0, sticky="w")
-search_entry = tk.Entry(table_frame, width=30)
-search_entry.grid(row=0, column=1, padx=10, pady=5)
-tk.Button(table_frame, text="Buscar", command=search_users, bg="#4CAF50", fg="white").grid(row=0, column=2, padx=5)
+scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
 
-# Treeview com colunas configuradas para rolagem horizontal
-columns = ("id", "name", "age", "email", "location", "gender", "hobbies")
-user_data_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
-user_data_tree.grid(row=1, column=0, columnspan=3, sticky="nsew")
+def on_canvas_configure(event):
+    canvas.itemconfig(1, width=event.width)
+    refresh_cards()
 
-# Configuração das colunas da tabela para habilitar rolagem horizontal
-for col in columns:
-    user_data_tree.heading(col, text=col.capitalize())
-    user_data_tree.column(col, minwidth=150, width=300, stretch=True)  # Largura ajustável e expansível
-
-# Barras de rolagem horizontal e vertical
-x_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=user_data_tree.xview)
-user_data_tree.configure(xscrollcommand=x_scroll.set)
-x_scroll.grid(row=2, column=0, columnspan=3, sticky="ew")
-
-y_scroll = ttk.Scrollbar(table_frame, orient="vertical", command=user_data_tree.yview)
-user_data_tree.configure(yscrollcommand=y_scroll.set)
-y_scroll.grid(row=1, column=3, sticky="ns")
-
-# Expansão do frame e da tabela
-table_frame.grid_rowconfigure(1, weight=1)
-table_frame.grid_columnconfigure(0, weight=1)
-
-# Carregar dados na tabela
-refresh_user_data()
+canvas.bind("<Configure>", on_canvas_configure)
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+canvas.configure(yscrollcommand=scrollbar.set)
 
 root.mainloop()
