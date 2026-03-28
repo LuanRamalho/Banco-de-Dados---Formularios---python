@@ -1,0 +1,74 @@
+[
+    {
+        "name": "Cláudio Silva",
+        "age": "32",
+        "email": "cl_silva@hotmail.com",
+        "location": "Esteio - RS",
+        "gender": "Masculino",
+        "hobbies": "Informática, Jogos, HQ"
+    },
+    {
+        "name": "Bruna Oliveira",
+        "age": "20",
+        "email": "bruna_oliveira@gmail.com",
+        "location": "Jau - SP",
+        "gender": "Feminino",
+        "hobbies": "Cinema, Praia"
+    },
+    {
+        "name": "Jóse Santos",
+        "age": "21",
+        "email": "josé_santos@gmail.com",
+        "location": "Santos - SP",
+        "gender": "Masculino",
+        "hobbies": "Churrasco, Pagode"
+    },
+    {
+        "name": "Geovani Medeiros",
+        "age": "32",
+        "email": "geo_med@gmail.com",
+        "location": "Vassouras - RJ",
+        "gender": "Masculino",
+        "hobbies": "Rolê, Praia"
+    },
+    {
+        "name": "Roberta Sales",
+        "age": "33",
+        "email": "r.s@gmail.com",
+        "location": "Jales - SP",
+        "gender": "Feminino",
+        "hobbies": "Cinema, Praia"
+    },
+    {
+        "name": "João Bosco",
+        "age": "32",
+        "email": "joaobosco@gmail.com",
+        "location": "São Luis - MA",
+        "gender": "Masculino",
+        "hobbies": "Informática, Jogos, Anime, Mangá"
+    },
+    {
+        "name": "Gabriel Silva",
+        "age": "23",
+        "email": "gs@gmail.com",
+        "location": "Santarém - PA",
+        "gender": "Masculino",
+        "hobbies": "Futebol"
+    },
+    {
+        "name": "Carlos José",
+        "age": "22",
+        "email": "cj@gmail.com",
+        "location": "São Paulo - SP",
+        "gender": "Masculino",
+        "hobbies": "Churrasco, Samba"
+    },
+    {
+        "name": "Gildo Barbosa",
+        "age": "31",
+        "email": "gil_caipira@gmail.com",
+        "location": "Bauru - SP",
+        "gender": "Masculino",
+        "hobbies": "Pescar, jogar futebol"
+    }
+]
